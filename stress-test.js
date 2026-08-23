@@ -1,6 +1,6 @@
 /* Stress the Stitch merge engine: scale, unicode, collision storms, generational churn. */
 const JSZip = require("jszip");
-const Merger = require("/Users/mac/app-inventor-fusion/merger.js");
+const Merger = require("./merger.js");
 const fs = require("fs");
 
 const t0 = Date.now();
