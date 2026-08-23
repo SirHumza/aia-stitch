@@ -1,41 +1,46 @@
-# App Inventor Fusion
+# AIA Stitch
 
-Merge MIT App Inventor `.aia` projects in your browser. No upload, no account — files never leave your machine.
+Stitch MIT App Inventor `.aia` projects right in your browser. No uploads, no accounts, nothing leaves your machine.
 
-**Use it:** https://sirhumza.github.io/app-inventor-fusion/
+**Use it here:** https://sirhumza.github.io/aia-stitch/
 
-Drop two or more `.aia` files, pick which screens and assets survive, hit merge, import the result in App Inventor via *Projects → Import (.aia)*.
+Drop two or more `.aia` files onto the page, untick anything you don't want, hit merge, then import the result in App Inventor through Projects > Import (.aia). Done.
 
-## What it handles
+## Why this exists
 
-- **Colliding screen names** — every project exports a `Screen1`, so the second+ occurrence gets prefixed with its project tag (`GameB_Screen1`), and the form name inside the `.scm` is rewritten to match.
-- **Duplicate assets** — assets are never renamed (screens and blocks reference them by filename), so duplicates keep the first copy and you get a warning instead of silent data loss.
-- **Valid output structure** — writes a real `youngandroidproject/project.properties` and preserves the `src/appinventor/ai_user/<Project>/` layout App Inventor expects.
-- **Selective merging** — uncheck any screen or asset to leave it out.
+Every App Inventor project starts with a screen called `Screen1`. So the moment you try to merge two projects by copying files, everything collides and breaks. This tool actually deals with that:
 
-## Development
+- Colliding screen names get prefixed with their project tag (`GameB_Screen1`), and the form name inside the screen's `.scm` gets rewritten so App Inventor doesn't choke.
+- Duplicate assets keep the first copy instead of silently overwriting. Assets are never renamed, because screens reference them by exact filename.
+- If a renamed screen's blocks use `open another screen`, you get a heads up to double check those targets, since those references are plain strings.
+- Uncheck any screen or asset you want left out. The project whose card sits highest keeps original names, and you can reorder cards with the arrows.
 
-Static site, no build step:
+The output has a proper `project.properties` and the folder layout App Inventor expects, so imports just work.
+
+## Running it locally
+
+It's a static site, there is no build step:
 
 ```
-index.html   markup
-style.css    design system (paper/ink/emerald)
-app.js       UI layer
-merger.js    pure .aia merge logic (browser + Node)
+python3 -m http.server 8000
 ```
 
-Run locally: `python3 -m http.server 8000`, open `http://localhost:8000`.
+Then open http://localhost:8000.
 
-The merge engine is unit-testable outside the browser:
+## Hacking on it
+
+Four files, that's the whole thing. `merger.js` holds the actual merge logic and works in Node too, which is how it gets tested:
 
 ```js
 const Merger = require("./merger.js");
 const result = await Merger.merge(
-  [{ label: "GameA", zip: jszipInstance, screens: ["Screen1"], assets: ["assets/logo.png"] }],
-  "MyMergedProject"
+  [{ label: "GameA", zip: myJszipInstance, screens: ["Screen1"], assets: ["assets/logo.png"] }],
+  "MergedProject"
 );
 ```
 
+An `.aia` is really just a zip file with some `.scm` (screen JSON), `.bky` (block XML) and assets inside. Once you know that, all of this seems a lot less magical.
+
 ## Credit
 
-Original concept from a decompiled Java "App Inventor Fusion" tool; this web implementation was rebuilt from scratch. An `.aia` is just a zip — that's the whole trick.
+Idea borrowed from an old Java tool of the same name that shipped as a jar. This web version shares none of its code.

@@ -49,15 +49,40 @@ function addProject() {
 
 function assetBase(path) { return path.split("/").pop(); }
 
+/* "4 components: Button, Canvas, Clock +1 more" from a screen's .scm, or null. */
+async function describeScreen(zip, screen) {
+  try {
+    var f = zip.file(screen.scmPath);
+    if (!f) return null;
+    var parsed = Merger.parseScm(await f.async("string"));
+    if (!parsed.ok) return null;
+    var comps = Merger.componentList(parsed.json); // children of the screen
+    if (!comps.length) return "empty screen";
+    var kids = comps.map(function (c) { return c.type; });
+    if (!kids.length) return "empty screen";
+    var shown = kids.slice(0, 4);
+    var extra = kids.length - shown.length;
+    return kids.length + " component" + (kids.length > 1 ? "s" : "") + ": " +
+      shown.join(", ") + (extra > 0 ? " +" + extra + " more" : "");
+  } catch (err) {
+    return null;
+  }
+}
+
 async function loadProject(file, card) {
   if (!file) return;
   if (!/\.aia$/i.test(file.name)) { log("Skipped " + file.name + " (only .aia files)", "err"); return; }
+  var dupe = projects.find(function (p) {
+    return p.zip && p.label === file.name.replace(/\.aia$/i, "") && p.size === file.size;
+  });
+  if (dupe) { log("Skipped " + file.name + " (already loaded)", "warn"); return; }
   log("Loading " + file.name + "...");
   try {
     var zip = await JSZip.loadAsync(file);
     var info = Merger.inspect(zip);
     var p = projects.find(function (x) { return x.card === card; });
     p.zip = zip;
+    p.size = file.size;
     p.screens = info.screens;
     p.assets = info.assets;
 
@@ -69,31 +94,49 @@ async function loadProject(file, card) {
       '<div class="phead">' +
         '<span class="pname"></span><span class="grow"></span>' +
         '<span class="pmeta"></span>' +
-        '<button class="iconbtn" title="Remove project"><i data-lucide="trash-2"></i></button>' +
+        '<button class="iconbtn mv" data-dir="-1" title="Move up (keeps original names)"><i data-lucide="arrow-up"></i></button>' +
+        '<button class="iconbtn mv" data-dir="1" title="Move down"><i data-lucide="arrow-down"></i></button>' +
+        '<button class="iconbtn rm" title="Remove project"><i data-lucide="trash-2"></i></button>' +
       "</div>" +
-      '<div class="grouplabel"><i data-lucide="layout-template"></i>Screens</div><div class="pills"></div>' +
+      '<div class="grouplabel"><i data-lucide="layout-template"></i>Screens' +
+        '<span class="grow"></span>' +
+        '<button class="iconbtn sel-all" title="Select all screens"><i data-lucide="check-check"></i></button>' +
+        '<button class="iconbtn sel-none" title="Deselect all screens"><i data-lucide="square"></i></button>' +
+      "</div><div class=\"pills\"></div>" +
       '<details class="assets"><summary><i data-lucide="chevron-right"></i>Assets (<span class="acount">0</span>)</summary><div class="assetlist"></div></details>';
 
     body.querySelector(".pname").textContent = file.name.replace(/\.aia$/i, "");
     body.querySelector(".pmeta").textContent =
       info.screens.length + " screens · " + info.assets.length + " assets · " + fmtSize(file.size);
-    body.querySelector(".iconbtn").addEventListener("click", function () {
+    body.querySelector(".rm").addEventListener("click", function () {
       projects = projects.filter(function (x) { return x.card !== card; });
       card.remove();
       log("Removed project.");
       refreshTally();
     });
+    Array.prototype.forEach.call(body.querySelectorAll(".mv"), function (btn) {
+      btn.addEventListener("click", function () { moveProject(card, Number(btn.dataset.dir)); });
+    });
+    body.querySelector(".sel-all").addEventListener("click", function () { setAllScreens(card, true); });
+    body.querySelector(".sel-none").addEventListener("click", function () { setAllScreens(card, false); });
 
     var pills = body.querySelector(".pills");
     if (!info.screens.length) pills.innerHTML = '<span class="none-note">no screens found</span>';
-    info.screens.forEach(function (s) {
+    for (var si = 0; si < info.screens.length; si++) {
+      var s = info.screens[si];
       var pill = el(
         '<label class="pill"><input type="checkbox" checked data-kind="screen" data-name=""></label>');
       pill.querySelector("input").dataset.name = s.name;
-      pill.appendChild(document.createElement("span")).textContent = s.name;
+      var span = pill.appendChild(document.createElement("span"));
+      span.textContent = s.name;
+      var summary = await describeScreen(zip, s);
+      if (summary) {
+        pill.title = summary;
+        span.style.borderStyle = "solid";
+      }
       pill.querySelector("input").addEventListener("change", refreshTally);
       pills.appendChild(pill);
-    });
+    }
 
     body.querySelector(".acount").textContent = info.assets.length;
     var list = body.querySelector(".assetlist");
@@ -116,6 +159,25 @@ async function loadProject(file, card) {
 }
 
 /* ---------- selection + tally ---------- */
+
+function setAllScreens(card, on) {
+  Array.prototype.forEach.call(card.querySelectorAll('input[data-kind="screen"]'), function (cb) {
+    cb.checked = on;
+  });
+  refreshTally();
+}
+
+/* Reorder projects (order decides who keeps canonical names in a collision). */
+function moveProject(card, dir) {
+  var i = projects.findIndex(function (p) { return p.card === card; });
+  var j = i + dir;
+  if (j < 0 || j >= projects.length) return;
+  var tmp = projects[i];
+  projects[i] = projects[j];
+  projects[j] = tmp;
+  card.parentNode.insertBefore(projects[i].card, projects[j].card);
+  log("Order changed: " + projects.map(function (p) { return p.label || "?"; }).join(" → "));
+}
 
 function currentSelections() {
   var loaded = projects.filter(function (p) { return p.zip; });
@@ -168,6 +230,8 @@ async function mergeProjects() {
         log("Duplicate asset '" + w.kept + "' in " + w.project + " skipped (first copy kept)", "warn");
       else if (w.type === "screen-renamed")
         log(w.project + ": screen '" + w.from + "' renamed to '" + w.to + "'", "warn");
+      else if (w.type === "screen-rename-check")
+        log(w.project + ": '" + w.to + "' uses 'open another screen' — check its targets after import", "warn");
     });
     log("Merged " + result.screenCount + " screen(s), " + result.files.length + " files into " + name + ".aia", "ok");
 
@@ -175,10 +239,14 @@ async function mergeProjects() {
     res.innerHTML =
       '<div class="row info"><i data-lucide="check-circle-2"></i><span>Downloaded <code>' + name + '.aia</code> — ' +
         result.screenCount + " screens, " + result.files.length + " files. Import via Projects → Import (.aia).</span></div>";
-    result.warnings.slice(0, 4).forEach(function (w) {
-      var text = w.type === "asset-duplicate"
-        ? "<code>" + w.skipped + "</code> skipped — <code>" + w.kept + "</code> already exists"
-        : "<code>" + w.from + "</code> → <code>" + w.to + "</code>";
+    result.warnings.slice(0, 5).forEach(function (w) {
+      var text;
+      if (w.type === "asset-duplicate")
+        text = "<code>" + w.skipped + "</code> skipped — <code>" + w.kept + "</code> already exists";
+      else if (w.type === "screen-rename-check")
+        text = "<code>" + w.to + "</code> uses <em>open another screen</em>, verify targets after import";
+      else
+        text = "<code>" + w.from + "</code> → <code>" + w.to + "</code>";
       var row = el('<div class="row warn"><i data-lucide="triangle-alert"></i><span>' + text + "</span></div>");
       res.appendChild(row);
     });

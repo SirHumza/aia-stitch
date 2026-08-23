@@ -102,7 +102,18 @@
           files.push({ path: dir + newName + ".scm", data: text });
         }
         var bky = p.zip.file(scr.bkyPath);
-        files.push({ path: dir + newName + ".bky", data: bky ? await bky.async("uint8array") : new Uint8Array(0) });
+        var bkyData = bky ? await bky.async("uint8array") : new Uint8Array(0);
+
+        // "open another screen" stores targets as plain strings we cannot
+        // safely rewrite, so flag projects whose renamed screens use it.
+        if (newName !== scr.name && bky) {
+          var bkyText = await bky.async("string");
+          if (/openanother/i.test(bkyText)) {
+            warnings.push({ type: "screen-rename-check", from: scr.name, to: newName, project: p.label });
+          }
+        }
+
+        files.push({ path: dir + newName + ".bky", data: bkyData });
         screenCount++;
       }
 
@@ -133,5 +144,37 @@
     return { files: files, propertiesText: serializeProperties(baseProps), warnings: warnings, screenCount: screenCount };
   }
 
-  return { inspect: inspect, merge: merge, parseProperties: parseProperties, serializeProperties: serializeProperties };
+  return {
+    inspect: inspect,
+    merge: merge,
+    parseProperties: parseProperties,
+    serializeProperties: serializeProperties,
+    parseScm: parseScm,
+    componentList: componentList
+  };
+
+  /* Parse a .scm file body into its JSON object. Returns {ok, json|error}. */
+  function parseScm(scmText) {
+    try {
+      var m = /\$JSON\s*([\s\S]*?)\|#/.exec(scmText);
+      if (!m) return { ok: false, error: "no $JSON section" };
+      return { ok: true, json: JSON.parse(m[1].trim()) };
+    } catch (err) {
+      return { ok: false, error: err.message };
+    }
+  }
+
+  /* Flatten the component tree of a parsed .scm into [{type, name}]. */
+  function componentList(scmJson) {
+    var out = [];
+    function walk(components) {
+      if (!components) return;
+      components.forEach(function (c) {
+        out.push({ type: c["$Type"] || "?", name: c["$Name"] || "?" });
+        if (c["$Components"]) walk(c["$Components"]);
+      });
+    }
+    if (scmJson && scmJson.Properties) walk(scmJson.Properties["$Components"]);
+    return out;
+  }
 });
