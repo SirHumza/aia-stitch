@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>App Inventor Fusion</title>
+<meta name="description" content="Merge App Inventor .aia projects — pick exactly which screens and assets survive.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.7.1/jszip.min.js"></script>
+<script src="https://unpkg.com/lucide@0.469.0/dist/umd/lucide.min.js"></script>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="wordmark"><i data-lucide="git-merge"></i> App Inventor Fusion</div>
+  <div class="spacer"></div>
+  <span class="chip">100% in your browser</span>
+  <a href="https://ai2.appinventor.mit.edu" target="_blank" rel="noopener">Open MIT App Inventor</a>
+</header>
+
+<div id="dragveil"><div class="frame"><i data-lucide="file-down"></i>Release to add project</div></div>
+
+<main class="shell">
+  <section>
+    <div class="intro">
+      <h1>Merge .aia projects<br>without losing your mind.</h1>
+      <p>Drop two or more App Inventor projects below. Every selected screen survives — colliding names get
+         auto-prefixed with their form data rewritten, and assets are never renamed, so references stay intact.</p>
+      <div class="steps">
+        <span><i data-lucide="upload"></i>Add .aia files</span>
+        <span><i data-lucide="mouse-pointer-click"></i>Pick screens &amp; assets</span>
+        <span><i data-lucide="git-merge"></i>Merge &amp; import</span>
+      </div>
+    </div>
+    <div id="stack" class="stack"></div>
+    <button class="iconbtn" id="addBtn" title="Add another project slot" style="border:1px solid var(--line);width:34px;height:34px;">
+      <i data-lucide="plus"></i>
+    </button>
+  </section>
+
+  <aside class="rail">
+    <div class="panel">
+      <h2><i data-lucide="settings-2"></i>Merge setup</h2>
+      <div class="field">
+        <label for="projectName">Merged project name</label>
+        <input id="projectName" value="MergedProject" spellcheck="false" autocomplete="off">
+      </div>
+      <div class="tally">
+        <div class="stat"><b id="tProjects">0</b><i>projects</i></div>
+        <div class="stat ok"><b id="tScreens">0</b><i>screens</i></div>
+        <div class="stat"><b id="tAssets">0</b><i>assets</i></div>
+      </div>
+      <button id="mergeBtn" disabled onclick="mergeProjects()">
+        <i data-lucide="git-merge"></i>Merge projects
+      </button>
+      <div id="result" class="result"></div>
+    </div>
+    <div class="panel">
+      <h2><i data-lucide="terminal"></i>Activity</h2>
+      <div id="log" aria-live="polite"></div>
+    </div>
+  </aside>
+</main>
+
+<footer>Files never leave your machine — merging happens entirely client-side.</footer>
+
+<script src="app.js"></script>
+</body>
+</html>
