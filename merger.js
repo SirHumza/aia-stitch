@@ -1,6 +1,7 @@
 /*
- * merger.js — pure .aia merge logic (no DOM), usable from browser and Node.
- * An .aia is a zip: youngandroidproject/project.properties, src/appinventor/ai_<user>/<Project>/*.scm|.bky, assets/*
+ * merger.js - pure .aia merge logic (no DOM), usable from browser and Node.
+ * An .aia is a zip: youngandroidproject/project.properties,
+ * src/appinventor/ai_<user>/<Project>/*.scm|.bky, assets/*
  */
 (function (root, factory) {
   if (typeof module === "object" && module.exports) module.exports = factory();
@@ -53,7 +54,7 @@
 
   /*
    * projects: [{ zip, screens: [screenName...], assets: [assetPath...] }]
-   * Returns { files: [{path, data(Uint8Array)}], propertiesText } — caller feeds to JSZip.
+   * Returns { files, propertiesText, warnings, screenCount } for the caller to zip up.
    */
   async function merge(projects, projectName) {
     var name = sanitize(projectName) || "MergedProject";
@@ -102,7 +103,9 @@
           files.push({ path: dir + newName + ".scm", data: text });
         }
         var bky = p.zip.file(scr.bkyPath);
-        var bkyData = bky ? await bky.async("uint8array") : new Uint8Array(0);
+        // A zero-byte .bky can trip App Inventor's importer; fall back to an empty block XML
+        var bkyData = bky ? await bky.async("uint8array") : new TextEncoder().encode(
+          '<xml xmlns="http://www.w3.org/1999/xhtml"></xml>');
 
         // "open another screen" stores targets as plain strings we cannot
         // safely rewrite, so flag projects whose renamed screens use it.
@@ -120,7 +123,7 @@
       for (var a = 0; a < selectedAssets.length; a++) {
         var assetPath = selectedAssets[a];
         var base = assetPath.split("/").pop();
-        // Never rename assets — screens/blocks reference them by filename.
+        // Never rename assets: screens/blocks reference them by filename.
         // On collision keep the first copy and warn instead of silently overwriting.
         if (usedAssets[base]) {
           warnings.push({ type: "asset-duplicate", kept: base, skipped: assetPath, project: p.label });

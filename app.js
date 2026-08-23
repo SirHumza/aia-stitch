@@ -1,4 +1,4 @@
-/* App Inventor Fusion — UI layer. Merge logic lives in merger.js (shared with Node tests). */
+/* AIA Stitch: UI layer. Merge logic lives in merger.js (shared with Node tests). */
 "use strict";
 
 var projects = [];
@@ -26,6 +26,13 @@ function log(msg, level) {
 }
 
 function icons() { if (window.lucide) lucide.createIcons(); }
+
+/* Escape untrusted strings (zip contents, filenames) before innerHTML use. */
+function esc(s) {
+  return String(s).replace(/[&<>"']/g, function (c) {
+    return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+  });
+}
 
 /* ---------- project cards ---------- */
 
@@ -57,7 +64,6 @@ async function describeScreen(zip, screen) {
     var parsed = Merger.parseScm(await f.async("string"));
     if (!parsed.ok) return null;
     var comps = Merger.componentList(parsed.json); // children of the screen
-    if (!comps.length) return "empty screen";
     var kids = comps.map(function (c) { return c.type; });
     if (!kids.length) return "empty screen";
     var shown = kids.slice(0, 4);
@@ -132,7 +138,6 @@ async function loadProject(file, card) {
       var summary = await describeScreen(zip, s);
       if (summary) {
         pill.title = summary;
-        span.style.borderStyle = "solid";
       }
       pill.querySelector("input").addEventListener("change", refreshTally);
       pills.appendChild(pill);
@@ -175,7 +180,9 @@ function moveProject(card, dir) {
   var tmp = projects[i];
   projects[i] = projects[j];
   projects[j] = tmp;
-  card.parentNode.insertBefore(projects[i].card, projects[j].card);
+  // Rebuild DOM order from the array so both directions actually move
+  var stack = document.getElementById("stack");
+  projects.forEach(function (p) { stack.appendChild(p.card); });
   log("Order changed: " + projects.map(function (p) { return p.label || "?"; }).join(" → "));
 }
 
@@ -231,22 +238,22 @@ async function mergeProjects() {
       else if (w.type === "screen-renamed")
         log(w.project + ": screen '" + w.from + "' renamed to '" + w.to + "'", "warn");
       else if (w.type === "screen-rename-check")
-        log(w.project + ": '" + w.to + "' uses 'open another screen' — check its targets after import", "warn");
+        log(w.project + ": '" + w.to + "' uses 'open another screen', check its targets after import", "warn");
     });
     log("Merged " + result.screenCount + " screen(s), " + result.files.length + " files into " + name + ".aia", "ok");
 
     var res = document.getElementById("result");
     res.innerHTML =
-      '<div class="row info"><i data-lucide="check-circle-2"></i><span>Downloaded <code>' + name + '.aia</code> — ' +
+      '<div class="row info"><i data-lucide="check-circle-2"></i><span>Downloaded <code>' + esc(name) + '.aia</code>, ' +
         result.screenCount + " screens, " + result.files.length + " files. Import via Projects → Import (.aia).</span></div>";
     result.warnings.slice(0, 5).forEach(function (w) {
       var text;
       if (w.type === "asset-duplicate")
-        text = "<code>" + w.skipped + "</code> skipped — <code>" + w.kept + "</code> already exists";
+        text = "<code>" + esc(w.skipped) + "</code> skipped, <code>" + esc(w.kept) + "</code> already exists";
       else if (w.type === "screen-rename-check")
-        text = "<code>" + w.to + "</code> uses <em>open another screen</em>, verify targets after import";
+        text = "<code>" + esc(w.to) + "</code> uses <em>open another screen</em>, verify targets after import";
       else
-        text = "<code>" + w.from + "</code> → <code>" + w.to + "</code>";
+        text = "<code>" + esc(w.from) + "</code> → <code>" + esc(w.to) + "</code>";
       var row = el('<div class="row warn"><i data-lucide="triangle-alert"></i><span>' + text + "</span></div>");
       res.appendChild(row);
     });
