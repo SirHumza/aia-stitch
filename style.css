@@ -189,4 +189,12 @@ details.assets[open] > summary svg { transform: rotate(90deg); }
 #dragveil svg { width: 34px; height: 34px; display: block; margin: 0 auto 10px; }
 
 footer { text-align: center; color: var(--ink-soft); font-size: 12px; padding: 20px 0 40px; }
-@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+@media (max-width: 480px) {
+  .topbar { padding: 10px 14px; flex-wrap: wrap; }
+  .shell { padding: 18px 14px 40px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; }
+  /* Keep instant-but-present feedback instead of killing all transitions */
+  * { transition-duration: .01ms !important; }
+}

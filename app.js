@@ -89,6 +89,7 @@ async function loadProject(file, card) {
     var p = projects.find(function (x) { return x.card === card; });
     p.zip = zip;
     p.size = file.size;
+    p.label = file.name.replace(/\.aia$/i, "");
     p.screens = info.screens;
     p.assets = info.assets;
 
@@ -128,6 +129,7 @@ async function loadProject(file, card) {
 
     var pills = body.querySelector(".pills");
     if (!info.screens.length) pills.innerHTML = '<span class="none-note">no screens found</span>';
+    var summaries = await Promise.all(info.screens.map(function (s) { return describeScreen(zip, s); }));
     for (var si = 0; si < info.screens.length; si++) {
       var s = info.screens[si];
       var pill = el(
@@ -135,9 +137,8 @@ async function loadProject(file, card) {
       pill.querySelector("input").dataset.name = s.name;
       var span = pill.appendChild(document.createElement("span"));
       span.textContent = s.name;
-      var summary = await describeScreen(zip, s);
-      if (summary) {
-        pill.title = summary;
+      if (summaries[si]) {
+        pill.title = summaries[si];
       }
       pill.querySelector("input").addEventListener("change", refreshTally);
       pills.appendChild(pill);
@@ -226,11 +227,12 @@ async function mergeProjects() {
     var blob = await out.generateAsync({ type: "blob", compression: "DEFLATE" });
 
     var name = Merger.parseProperties(result.propertiesText).name;
+    if (mergeProjects.lastUrl) URL.revokeObjectURL(mergeProjects.lastUrl);
     var a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
+    mergeProjects.lastUrl = URL.createObjectURL(blob);
+    a.href = mergeProjects.lastUrl;
     a.download = name + ".aia";
     a.click();
-    setTimeout(function () { URL.revokeObjectURL(a.href); }, 5000);
 
     result.warnings.forEach(function (w) {
       if (w.type === "asset-duplicate")

@@ -103,9 +103,11 @@
           files.push({ path: dir + newName + ".scm", data: text });
         }
         var bky = p.zip.file(scr.bkyPath);
-        // A zero-byte .bky can trip App Inventor's importer; fall back to an empty block XML
-        var bkyData = bky ? await bky.async("uint8array") : new TextEncoder().encode(
-          '<xml xmlns="http://www.w3.org/1999/xhtml"></xml>');
+        // A missing or non-XML .bky can trip App Inventor's importer; fall back
+        var bkyText = bky ? await bky.async("string") : "";
+        if (bkyText.indexOf("<xml") === -1) {
+          bkyText = '<xml xmlns="http://www.w3.org/1999/xhtml"></xml>';
+        }
 
         // "open another screen" stores targets as plain strings we cannot
         // safely rewrite, so flag projects whose renamed screens use it.
@@ -116,7 +118,7 @@
           }
         }
 
-        files.push({ path: dir + newName + ".bky", data: bkyData });
+        files.push({ path: dir + newName + ".bky", data: bkyText });
         screenCount++;
       }
 
