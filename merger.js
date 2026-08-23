@@ -49,7 +49,7 @@
   }
 
   function sanitize(s) {
-    return String(s).replace(/[^A-Za-z0-9_]/g, "").slice(0, 20) || "Proj";
+    return String(s).replace(/[^A-Za-z0-9_]/g, "").slice(0, 30) || "Project";
   }
 
   /*
